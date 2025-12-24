@@ -37,12 +37,6 @@ lightning_logs/
 *.pt
 *.ckpt
 
-# Data dumps (keep code small; stage curated samples explicitly)
-data/
-dataset/
-*.mat
-*.npz
-*.npy
 
 # Archives
 *.zip
