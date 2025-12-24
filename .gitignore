@@ -1,0 +1,50 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Python cache / build
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+build/
+dist/
+
+# Environments
+.env
+.env.*
+venv/
+.venv/
+env/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# Logs / temp
+*.log
+*.out
+*.tmp
+
+# Checkpoints and runs
+checkpoint/
+checkpoints/
+runs/
+lightning_logs/
+*.pth
+*.pt
+*.ckpt
+
+# Data dumps (keep code small; stage curated samples explicitly)
+data/
+dataset/
+*.mat
+*.npz
+*.npy
+
+# Archives
+*.zip
+*.rar
+*.tar.gz
