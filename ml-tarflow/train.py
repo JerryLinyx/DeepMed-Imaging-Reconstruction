@@ -148,6 +148,8 @@ def main(args):
         if (epoch + 1) % args.sample_freq == 0:
             for i in range(args.num_samples // args.sample_batch_size):
                 b = args.sample_batch_size // dist.world_size
+                if dist.local_rank == 0:
+                    print(f"Sampling batch {i+1}/{args.num_samples // args.sample_batch_size}...", end='\r')
                 noise = fixed_noise[i * b : (i + 1) * b].to('cuda')
                 y = None if fixed_y is None else fixed_y[i * b : (i + 1) * b].to('cuda')
                 with torch.no_grad():
