@@ -155,7 +155,10 @@ def main(args):
                         samples = model.reverse(noise, y, guidance=args.cfg)
                         assert isinstance(samples, torch.Tensor)
                     samples = dist.gather_concat(samples)
-                    fid.update(0.5 * (samples.clip(min=-1, max=1) + 1), real=False)
+                    samples_fid = 0.5 * (samples.clip(min=-1, max=1) + 1)
+                    if samples_fid.shape[1] == 1:
+                        samples_fid = samples_fid.repeat(1, 3, 1, 1)
+                    fid.update(samples_fid, real=False)
                 if args.dry_run:
                     break
             fid_score = fid.compute().item()
@@ -172,7 +175,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--data', default='data', type=pathlib.Path, help='Path for training data')
     parser.add_argument('--logdir', default='runs', type=pathlib.Path, help='Path for artifacts')
-    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq'], help='Name of dataset')
+    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq', 'pet'], help='Name of dataset')
     parser.add_argument('--img_size', default=64, type=int, help='Image size')
     parser.add_argument('--channel_size', default=3, type=int, help='Image channel size')
 

@@ -29,7 +29,10 @@ def main(args):
 
     for x, _ in data_loader:
         x = x.cuda()
-        fid.update(dist.gather_concat(0.5 * (x + 1)), real=True)
+        x = dist.gather_concat(0.5 * (x + 1))
+        if x.shape[1] == 1:
+            x = x.repeat(1, 3, 1, 1)
+        fid.update(x, real=True)
 
     if dist.local_rank == 0:
         torch.save(fid.state_dict(), fid_stats_file)
@@ -40,7 +43,7 @@ def main(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', default='data', type=pathlib.Path, help='Path for training data')
-    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq'], help='Name of dataset')
+    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq', 'pet'], help='Name of dataset')
     parser.add_argument('--img_size', default=32, type=int, help='Image size')
     parser.add_argument('--channel_size', default=3, type=int, help='Image channel size')
     parser.add_argument('--batch_size', default=1024, type=int, help='Batch size')

@@ -121,7 +121,7 @@ class Metrics:
 
 
 def get_num_classes(dataset: str) -> int:
-    return {'imagenet64': 0, 'imagenet': 1000, 'afhq': 3}[dataset]
+    return {'imagenet64': 0, 'imagenet': 1000, 'afhq': 3, 'pet': 0}[dataset]
 
 
 def get_data(dataset: str, img_size: int, folder: pathlib.Path) -> tuple[torch.utils.data.Dataset, int]:
@@ -140,6 +140,57 @@ def get_data(dataset: str, img_size: int, folder: pathlib.Path) -> tuple[torch.u
         data = tv.datasets.ImageFolder(str(folder / 'imagenet'), transform=transform)
     elif dataset == 'afhq':
         data = tv.datasets.ImageFolder(str(folder / 'afhq'), transform=transform)
+    elif dataset == 'pet':
+        import datasets
+        
+        # Load PET data: expect 'data_re.pt' in the data folder
+        pt_path = folder / pet / 'data_re.pt'
+        if not pt_path.exists():
+            # Try looking in parent directory if not found
+            if (folder.parent / 'data_re.pt').exists():
+               pt_path = folder.parent / 'data_re.pt'
+            else:
+               raise FileNotFoundError(f"Could not find data_re.pt in {folder} or {folder.parent}")
+
+        print(f"Loading PET data from {pt_path}...")
+        tensor = torch.load(pt_path) # [N, H, W]
+        
+        # 1. Add channel dim if missing: [N, H, W] -> [N, 1, H, W]
+        if tensor.ndim == 3:
+            tensor = tensor.unsqueeze(1)
+        
+        # 2. Normalize to [-1, 1]
+        d_min, d_max = tensor.min(), tensor.max()
+        print(f"Original Data Range: [{d_min:.2f}, {d_max:.2f}]")
+        if d_max > d_min:
+            tensor = (tensor - d_min) / (d_max - d_min) # [0, 1]
+            tensor = tensor * 2 - 1 # [-1, 1]
+        
+        # 3. Resize if necessary
+        if tensor.shape[-1] != img_size:
+            tensor = torch.nn.functional.interpolate(tensor, size=(img_size, img_size), mode='bilinear')
+        
+        print(f"Processed Tensor Shape: {tensor.shape}, Range: [{tensor.min():.2f}, {tensor.max():.2f}]")
+        
+        # Wrap in Hugging Face Dataset
+        print("Wrapping in Hugging Face Dataset...")
+        hf_ds = datasets.Dataset.from_dict({
+            "x": tensor,
+            "y": torch.zeros(len(tensor), dtype=torch.long)
+        })
+        hf_ds.set_format(type='torch', columns=['x', 'y'])
+
+        # Wrapper to make it compatible with existing code that expects (x, y) tuple
+        class HFWrapper(torch.utils.data.Dataset):
+            def __init__(self, ds):
+                self.ds = ds
+            def __len__(self):
+                return len(self.ds)
+            def __getitem__(self, idx):
+                item = self.ds[idx]
+                return item['x'], item['y']
+        
+        data = HFWrapper(hf_ds)
     else:
         raise NotImplementedError(f'Unknown dataset {dataset}')
     return data, get_num_classes(dataset)
