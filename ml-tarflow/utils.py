@@ -144,7 +144,7 @@ def get_data(dataset: str, img_size: int, folder: pathlib.Path) -> tuple[torch.u
         import datasets
         
         # Load PET data: expect 'data_re.pt' in the data folder
-        pt_path = folder / pet / 'data_re.pt'
+        pt_path = folder / 'pet' / 'data_re.pt'
         if not pt_path.exists():
             # Try looking in parent directory if not found
             if (folder.parent / 'data_re.pt').exists():
