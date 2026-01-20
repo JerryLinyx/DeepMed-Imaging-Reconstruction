@@ -11,10 +11,6 @@ def resize_dataset():
     
     args = parser.parse_args()
 
-    # Determine output path if not specified
-    if args.output is None:
-        args.output = args.input.parent / f"{args.input.stem}_{args.size}{args.input.suffix}"
-
     if not args.input.exists():
         print(f"Error: Input file {args.input} does not exist.")
         return
@@ -37,9 +33,12 @@ def resize_dataset():
     
     print(f"New shape: {new_data.shape}")
     
-    # Ensure output path includes size if not manually specified
+    # Create output path in a separate folder named with the size
     if args.output is None:
-        args.output = args.input.parent / f"{args.input.stem}_{args.size}{args.input.suffix}"
+        # Create a new folder: data/pet_12000/
+        output_folder = args.input.parent.parent / f"pet_{args.size}"
+        output_folder.mkdir(parents=True, exist_ok=True)
+        args.output = output_folder / args.input.name
     
     print(f"Saving to {args.output}...")
     torch.save(new_data, args.output)

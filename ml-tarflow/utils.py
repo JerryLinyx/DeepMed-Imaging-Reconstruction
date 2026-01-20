@@ -121,7 +121,7 @@ class Metrics:
 
 
 def get_num_classes(dataset: str) -> int:
-    return {'imagenet64': 0, 'imagenet': 1000, 'afhq': 3, 'pet': 0}[dataset]
+    return {'imagenet64': 0, 'imagenet': 1000, 'afhq': 3, 'pet': 0, 'pet_12000': 0}[dataset]
 
 
 def get_data(dataset: str, img_size: int, folder: pathlib.Path) -> tuple[torch.utils.data.Dataset, int]:
@@ -140,19 +140,22 @@ def get_data(dataset: str, img_size: int, folder: pathlib.Path) -> tuple[torch.u
         data = tv.datasets.ImageFolder(str(folder / 'imagenet'), transform=transform)
     elif dataset == 'afhq':
         data = tv.datasets.ImageFolder(str(folder / 'afhq'), transform=transform)
-    elif dataset == 'pet':
+    elif dataset in ['pet', 'pet_12000']:
         import datasets
         
+        # Determine the folder name based on dataset
+        dataset_folder = 'pet_12000' if dataset == 'pet_12000' else 'pet'
+        
         # Load PET data: expect 'data_re.pt' in the data folder
-        pt_path = folder / 'pet' / 'data_re.pt'
+        pt_path = folder / dataset_folder / 'data_re.pt'
         if not pt_path.exists():
-            # Try looking in parent directory if not found
-            if (folder.parent / 'data_re.pt').exists():
+            # For 'pet', try looking in parent directory if not found
+            if dataset == 'pet' and (folder.parent / 'data_re.pt').exists():
                pt_path = folder.parent / 'data_re.pt'
             else:
-               raise FileNotFoundError(f"Could not find data_re.pt in {folder} or {folder.parent}")
+               raise FileNotFoundError(f"Could not find data_re.pt in {folder / dataset_folder}")
 
-        print(f"Loading PET data from {pt_path}...")
+        print(f"Loading {dataset.upper()} data from {pt_path}...")
         tensor = torch.load(pt_path) # [N, H, W]
         
         # 1. Add channel dim if missing: [N, H, W] -> [N, 1, H, W]

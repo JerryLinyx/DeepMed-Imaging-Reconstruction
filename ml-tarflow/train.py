@@ -177,7 +177,7 @@ if __name__ == '__main__':
 
     parser.add_argument('--data', default='data', type=pathlib.Path, help='Path for training data')
     parser.add_argument('--logdir', default='runs', type=pathlib.Path, help='Path for artifacts')
-    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq', 'pet'], help='Name of dataset')
+    parser.add_argument('--dataset', default='imagenet', choices=['imagenet', 'imagenet64', 'afhq', 'pet', 'pet_12000'], help='Name of dataset')
     parser.add_argument('--img_size', default=64, type=int, help='Image size')
     parser.add_argument('--channel_size', default=3, type=int, help='Image channel size')
 
