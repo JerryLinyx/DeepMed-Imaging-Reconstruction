@@ -1,3 +1,5 @@
+data/
+
 # OS / editor
 .DS_Store
 .idea/
