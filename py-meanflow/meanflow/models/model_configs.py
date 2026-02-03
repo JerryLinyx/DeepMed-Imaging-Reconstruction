@@ -33,7 +33,11 @@ def instantiate_model(args) -> nn.Module:
         architechture in MODEL_CONFIGS
     ), f"Model architecture {architechture} is missing its config."
 
-    configs = MODEL_CONFIGS[architechture]
+    # Make a copy so we don't mutate the global template when overriding
+    configs = MODEL_CONFIGS[architechture].copy()
+    configs['img_resolution'] = getattr(args, 'img_res', configs['img_resolution'])
+    configs['in_channels'] = getattr(args, 'in_channels', configs['in_channels'])
+    configs['out_channels'] = getattr(args, 'out_channels', configs['out_channels'])
     configs['dropout'] = args.dropout
     arch = MODEL_ARCHS[architechture]
     if args.use_edm_aug:

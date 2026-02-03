@@ -16,6 +16,7 @@ from functools import partial
 
 import numpy as np
 import torch
+import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
 import torchvision.datasets as datasets
 from models.model_configs import instantiate_model
@@ -65,6 +66,21 @@ def get_data_loader(args, is_for_fid):
             download=True,
             transform=transforms,
         )
+    elif args.dataset in ["pet", "pet_12000"]:
+        pt_path = Path(args.data_path) / args.dataset / "data_re.pt"
+        if not pt_path.exists():
+            raise FileNotFoundError(f"PET tensor not found at {pt_path}")
+        logger.info(f"Loading PET tensor from {pt_path}")
+        x = torch.load(pt_path)  # [N,H,W] or [N,1,H,W]
+        if x.ndim == 3:
+            x = x.unsqueeze(1)
+        x = x.float()
+        x_min, x_max = x.min(), x.max()
+        x = (x - x_min) / (x_max - x_min + 1e-8)  # [0,1]
+        if x.shape[-1] != args.img_res:
+            x = F.interpolate(x, size=(args.img_res, args.img_res), mode="bilinear")
+        y = torch.zeros(len(x), dtype=torch.long)
+        dataset = torch.utils.data.TensorDataset(x, y)
     else:
         raise NotImplementedError(f"Unsupported dataset {args.dataset}")
 
@@ -126,6 +142,13 @@ def main(args):
     cudnn.benchmark = True
 
     logger.info(f"Initializing Dataset: {args.dataset}")
+    if args.dataset in ["pet", "pet_12000"]:
+        if args.img_res == 32:  # default value; auto-bump for PET
+            args.img_res = 128
+            logger.info("Auto-setting img_res to 128 for PET. Override with --img_res if desired.")
+        args.in_channels = 1
+        args.out_channels = 1
+
     data_loader_train = get_data_loader(args, is_for_fid=False)
     data_loader_fid = get_data_loader(args, is_for_fid=True)
 

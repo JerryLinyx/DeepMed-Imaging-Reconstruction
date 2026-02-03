@@ -25,8 +25,11 @@ def get_args_parser():
     parser.add_argument("--ema_decays", default=[0.99995, 0.9996], nargs="+", type=float, help="Extra EMA decay rates.")
 
     # Dataset parameters
-    parser.add_argument("--dataset", default='cifar10', type=str, choices=['cifar10', 'mnist'], help="Dataset to use.")
+    parser.add_argument("--dataset", default='cifar10', type=str, choices=['cifar10', 'mnist', 'pet', 'pet_12000'], help="Dataset to use.")
     parser.add_argument("--data_path", default="./data", type=str, help="data root folder with train, val and test subfolders")
+    parser.add_argument("--img_res", default=32, type=int, help="Target image resolution (HxW) after preprocessing.")
+    parser.add_argument("--in_channels", default=3, type=int, help="Number of input channels.")
+    parser.add_argument("--out_channels", default=3, type=int, help="Number of output channels.")
 
     parser.add_argument("--output_dir", default="./output_dir", help="path where to save, empty for no saving")
     parser.add_argument("--fid_samples", default=50000, type=int, help="number of synthetic samples for FID evaluations")
