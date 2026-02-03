@@ -35,6 +35,17 @@ except ImportError:
     print("Warning: Could not import TarflowModel")
     TarflowModel = None
 
+# MeanFlow imports
+try:
+    sys.path.append(os.path.join(current_dir, 'py-meanflow/meanflow'))
+    from models.meanflow import MeanFlow
+    from models.unet import SongUNet
+    from types import SimpleNamespace
+except ImportError:
+    print("Warning: Could not import MeanFlow")
+    MeanFlow = None
+    SongUNet = None
+
 
 class UnifiedFlowModel(nn.Module):
     """
@@ -183,6 +194,96 @@ class TarflowAdapter(UnifiedFlowModel):
         return self.model.get_loss(z, logdet)
 
 
+class MeanFlowAdapter(UnifiedFlowModel):
+    def __init__(self, img_resolution=32, in_channels=3, out_channels=3,
+                 dropout=0.2, ratio=0.75, ema_decay=0.9999, 
+                 ema_decays=[0.99995, 0.9996], norm_p=0.75, norm_eps=1e-3,
+                 channel_mult=[2, 2, 2], **kwargs):
+        super().__init__()
+        if MeanFlow is None or SongUNet is None:
+            raise ImportError("MeanFlow or SongUNet class not found.")
+        
+        # Create args namespace with required parameters
+        args = SimpleNamespace(
+            ratio=ratio,
+            dropout=dropout,
+            ema_decay=ema_decay,
+            ema_decays=ema_decays,
+            norm_p=norm_p,
+            norm_eps=norm_eps,
+            use_edm_aug=False,
+            tr_sampler='v1',
+            P_mean_t=-0.6,
+            P_std_t=1.6,
+            P_mean_r=-4.0,
+            P_std_r=1.6
+        )
+        
+        # Network configuration
+        net_configs = {
+            'img_resolution': img_resolution,
+            'in_channels': in_channels,
+            'out_channels': out_channels,
+            'channel_mult_noise': 2,
+            'resample_filter': [1, 3, 3, 1],
+            'channel_mult': channel_mult,
+            'encoder_type': 'standard',
+            'decoder_type': 'standard',
+            'dropout': dropout,
+        }
+        
+        self.model = MeanFlow(arch=SongUNet, args=args, net_configs=net_configs)
+        self.img_resolution = img_resolution
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+    
+    def forward(self, x, condition=None, **kwargs):
+        """
+        Forward pass with loss computation.
+        Returns:
+            z: Not applicable for MeanFlow (returns None)
+            logdet: Not applicable for MeanFlow (returns None)  
+            other: Dictionary containing 'loss'
+        """
+        # MeanFlow's forward_with_loss expects (x, aug_cond)
+        aug_cond = condition
+        loss = self.model.forward_with_loss(x, aug_cond)
+        return None, None, {'loss': loss}
+    
+    def inverse(self, z=None, condition=None, **kwargs):
+        """
+        Sample from the model.
+        For MeanFlow, z is ignored and sampling is done from scratch.
+        """
+        device = kwargs.get('device', 'cpu')
+        num_samples = kwargs.get('num_samples', 1)
+        
+        samples_shape = (num_samples, self.in_channels, 
+                        self.img_resolution, self.img_resolution)
+        
+        return self.model.sample(samples_shape, device=device)
+    
+    def get_loss(self, z, logdet, **kwargs):
+        """
+        Get loss from forward pass results.
+        For MeanFlow, the loss is stored in kwargs.
+        """
+        if 'loss' in kwargs:
+            return kwargs['loss']
+        # If not in kwargs, need to compute it
+        return 0.0
+    
+    def sample(self, num_samples, device, condition=None, input_shape=None, **kwargs):
+        """
+        Convenience method to sample from the prior and generate.
+        """
+        if input_shape is None:
+            input_shape = (self.in_channels, self.img_resolution, self.img_resolution)
+        
+        samples_shape = (num_samples,) + input_shape
+        return self.model.sample(samples_shape, device=device)
+
+
 class ModelFactory:
     @staticmethod
     def create_model(model_type, config):
@@ -201,6 +302,8 @@ class ModelFactory:
             return GlowAdapter(**config)
         elif model_type == 'tarflow':
             return TarflowAdapter(**config)
+        elif model_type == 'meanflow':
+            return MeanFlowAdapter(**config)
         else:
             raise ValueError(f"Unknown model type: {model_type}")
 

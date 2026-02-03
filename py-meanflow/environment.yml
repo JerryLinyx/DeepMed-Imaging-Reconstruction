@@ -1,0 +1,19 @@
+name: meanflow
+channels:
+  - pytorch
+  - conda-forge
+  - nvidia
+dependencies:
+  - python=3.10
+  - pytorch
+  - pytorch-cuda
+  - matplotlib
+  - jupyter
+  - numpy
+  - pip
+  - pip:
+    - ipykernel
+    - torchmetrics[image]
+    - torchvision
+    - tensorboard
+
