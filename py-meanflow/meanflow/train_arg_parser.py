@@ -73,7 +73,4 @@ def get_args_parser():
     parser.add_argument("--test_run", action="store_true", help="Only run one batch of training and evaluation.")
     parser.add_argument("--not_compile", action="store_false", dest="compile", default=True, help="Disable compilation.")
 
-    # Mixed precision
-    parser.add_argument("--no_amp", action="store_false", dest="amp", default=True, help="Disable CUDA AMP mixed precision training.")
-
     return parser

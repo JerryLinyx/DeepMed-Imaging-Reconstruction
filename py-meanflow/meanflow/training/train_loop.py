@@ -68,8 +68,8 @@ def get_compiled_counts():
 augment_pipe = AugmentPipe(p=0.12, xflip=1e8, yflip=0, scale=1, rotate_frac=0, aniso=1, translate_frac=1)  # turn off yflip and rotate
 
 def train_step(model_without_ddp, *args, **kwargs):
-    """Forward-only loss computation; backward handled outside for AMP support."""
     loss = model_without_ddp.forward_with_loss(*args, **kwargs)
+    loss.backward(create_graph=False)
     return loss
 
 
@@ -84,7 +84,6 @@ def train_one_epoch(
     log_writer: Any,
     args: argparse.Namespace,
     meters: dict[str, MeanMetric],
-    scaler: torch.cuda.amp.GradScaler,
 ):
     gc.collect()
     model.train(True)
@@ -111,29 +110,14 @@ def train_one_epoch(
         if args.compile and epoch == args.start_epoch and data_iter_step == 0:
             logging.info(f"Compiling the first train step, this may take a while...")
         
-        with torch.cuda.amp.autocast(enabled=args.amp, dtype=torch.float16):
-            loss = rng.train_step_with_rng_control(compiled_train_step, model_without_ddp, steps, args.seed, samples, aug_cond)
-
-        if args.amp:
-            # backward with scaler
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
-        else:
-            loss.backward(create_graph=False)
+        loss = rng.train_step_with_rng_control(compiled_train_step, model_without_ddp, steps, args.seed, samples, aug_cond)
+        if args.compile:
+            assert get_compiled_counts() > 0, "Compilation not triggered."
 
         # sanity check
         synchronize_gradients(model)  # To support compiling, we need to call model.module and then sync gradients.
         if (epoch - args.start_epoch) % 100 == 0 and data_iter_step < 2:  # sanity check after the first steps
             gradient_sanity_check(model)
-
-        if args.amp:
-            scaler.step(optimizer)
-            scaler.update()
-        else:
-            optimizer.step()
-
-        if args.compile:
-            assert get_compiled_counts() > 0, "Compilation not triggered."
 
         loss_value = loss.item()
         batch_loss.update(loss_value)
@@ -141,6 +125,8 @@ def train_one_epoch(
         if not math.isfinite(loss_value):
             raise ValueError(f"Loss is {loss_value}, stopping training")
 
+        # update the parameters
+        optimizer.step()
         model_without_ddp.update_ema()  # moved to begin of train_step
 
         # logging

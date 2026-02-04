@@ -18,7 +18,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import torch.backends.cudnn as cudnn
-from torch.cuda.amp import autocast, GradScaler
 import torchvision.datasets as datasets
 from models.model_configs import instantiate_model
 from train_arg_parser import get_args_parser
@@ -135,9 +134,6 @@ def main(args):
 
     device = torch.device(args.device)
 
-    # AMP scaler (only meaningful on CUDA)
-    scaler = GradScaler(enabled=args.amp and device.type == "cuda")
-
     # set the seeds
     seed = args.seed + distributed_mode.get_rank()  # legacy. TODO: rng.fold_in 
     torch.manual_seed(seed)
@@ -231,8 +227,7 @@ def main(args):
                 epoch=epoch,
                 log_writer=log_writer,
                 args=args,
-                meters=meters,
-                scaler=scaler,
+                meters=meters
             )
 
         if args.output_dir and (
