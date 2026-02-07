@@ -25,6 +25,18 @@ logger = logging.getLogger(__name__)
 PRINT_FREQUENCY = 10
 
 
+def _to_fid_input(images: torch.Tensor) -> torch.Tensor:
+    """Ensure images are valid for Inception-FID (N,3,H,W) in [0,1]."""
+    if images.ndim != 4:
+        raise ValueError(f"Expected 4D tensor [N,C,H,W], got shape {tuple(images.shape)}")
+    channels = images.shape[1]
+    if channels == 1:
+        images = images.repeat(1, 3, 1, 1)
+    elif channels > 3:
+        images = images[:, :3, :, :]
+    return images
+
+
 def eval_model(
     model: DistributedDataParallel,
     net_ema: torch.nn.Module,
@@ -54,7 +66,8 @@ def eval_model(
 
     for data_iter_step, (samples, _) in enumerate(data_loader):
         samples = samples.to(device, non_blocking=True)
-        fid_metric.update(samples, real=True)  # real is always on the entire dataset
+        samples_fid = _to_fid_input(samples)
+        fid_metric.update(samples_fid, real=True)  # real is always on the entire dataset
 
         if num_synthetic < fid_samples:          
             model_without_ddp = model.module if isinstance(model, DistributedDataParallel) else model  
@@ -73,10 +86,12 @@ def eval_model(
             synthetic_samples = torch.floor(synthetic_samples * 255)
 
             synthetic_samples = synthetic_samples.to(torch.float32) / 255.0
+            synthetic_samples_fid = _to_fid_input(synthetic_samples)
 
             if num_synthetic + synthetic_samples.shape[0] > fid_samples:
                 synthetic_samples = synthetic_samples[: fid_samples - num_synthetic]
-            fid_metric.update(synthetic_samples, real=False)
+                synthetic_samples_fid = synthetic_samples_fid[: fid_samples - num_synthetic]
+            fid_metric.update(synthetic_samples_fid, real=False)
             num_synthetic += synthetic_samples.shape[0]
             if not snapshots_saved and args.output_dir:
                 save_image(
@@ -103,7 +118,10 @@ def eval_model(
                         image_dir
                         / f"{distributed_mode.get_rank()}_{data_iter_step}_{batch_index}.png"
                     )
-                    PIL.Image.fromarray(image_np, "RGB").save(image_path)
+                    if image_np.shape[-1] == 1:
+                        PIL.Image.fromarray(image_np[..., 0], "L").save(image_path)
+                    else:
+                        PIL.Image.fromarray(image_np, "RGB").save(image_path)
 
         if not args.compute_fid:
             return {}
